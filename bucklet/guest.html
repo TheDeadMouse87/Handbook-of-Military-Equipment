@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Справочник военной техники - Танк, Самолет и БТР</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #232b35, #303b26);
+            color: #e0e1dd;
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+        
+        .background-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            overflow: hidden;
+        }
+        
+        .background-pattern {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 300%; /* Увеличиваем высоту для повторения */
+            background: url('background.png') repeat center bottom;
+            background-size: 1920px 1080px;
+            opacity: 0.7;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        header {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .logo {
+            width: 800px;
+            height: 300px;
+            background: url('logo.png') no-repeat center center;
+            background-size: 800px 300px;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+            margin-bottom: 30px;
+        }
+        
+        .subtitle {
+            font-size: 1.5rem;
+            color: #a0a0a0;
+            max-width: 800px;
+            line-height: 1.6;
+        }
+        
+        .content-section {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            padding: 100px 20px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .content-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            gap: 30px;
+        }
+        
+        .text-block {
+            flex: 1;
+            max-width: 35%;
+            opacity: 0;
+            transform: translateX(-100px);
+            transition: all 1s ease;
+            background: rgba(35, 43, 53, 0.8);
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        }
+        
+        .text-block.visible {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        
+        .text-block h3 {
+            color: #ffd700;
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+        
+        .text-block p {
+            line-height: 1.7;
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+        }
+        
+        .image-container {
+            flex: 2;
+            max-width: 65%;
+            position: relative;
+            opacity: 0;
+            transform: translateX(100px);
+            transition: all 1s ease 0.3s;
+        }
+        
+        .image-container.visible {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        
+        .image-container img {
+            width: 100%;
+            height: auto;
+            box-shadow: none;
+            border-radius: 0;
+            max-height: 80vh;
+            object-fit: contain;
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 40px 20px;
+            margin-top: 50px;
+            border-top: 1px solid #ffd700;
+            color: #a0a0a0;
+            position: relative;
+            z-index: 1;
+            background: rgba(35, 43, 53, 0.8);
+            border-radius: 10px;
+        }
+        
+        .login-btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #ffd700, #ffaa00);
+            color: #1b263b;
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 15px 40px;
+            margin: 20px 0;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3);
+        }
+        
+        .login-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5);
+            background: linear-gradient(135deg, #ffaa00, #ffd700);
+        }
+        
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            .logo {
+                width: 500px;
+                height: 200px;
+                background-size: 500px 200px;
+            }
+            
+            .subtitle {
+                font-size: 1.2rem;
+            }
+            
+            .content-wrapper {
+                flex-direction: column;
+            }
+            
+            .text-block, .image-container {
+                max-width: 100%;
+            }
+            
+            .login-btn {
+                font-size: 1rem;
+                padding: 12px 30px;
+            }
+            
+            .background-pattern {
+                height: 200%;
+                background-size: 1200px 600px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .logo {
+                width: 350px;
+                height: 150px;
+                background-size: 350px 150px;
+            }
+            
+            .background-pattern {
+                height: 150%;
+                background-size: 800px 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="background-container">
+        <div class="background-pattern"></div>
+    </div>
+    
+    <div class="container">
+        <header>
+            <div class="logo"></div>
+            <p class="subtitle">Буклет с описанием курсовой работы.</p>
+        </header>
+        
+        <section class="content-section">
+            <div class="content-wrapper">
+                <div class="text-block">
+                    <h3>Система содержит наземную и воздушную военную технику</h3>
+                    <p>В справочнике добавлены многие модели как воздушной, так и наземной военной специфики, чтобы пользователи могли ознакомиться с разными видами техники.</p>
+                    <p>В системе находиться более 20 моделей военной техники, которые были изготовлены в различных странах, учавствовавших в военных конфликтах.</p>
+                </div>
+                <div class="image-container">
+                    <img src="tank.png" alt="Танк">
+                </div>
+            </div>
+        </section>
+        
+        <section class="content-section">
+            <div class="content-wrapper">
+                <div class="text-block">
+                    <h3>В системе реализованна система фильтрации</h3>
+                    <p>В системе, для удобства пользователя, реализованна система фильтрации по годам, стране, статусу службы, а также по названию.</p>
+                </div>
+                <div class="image-container">
+                    <img src="airplane.png" alt="Истребитель">
+                </div>
+            </div>
+        </section>
+        
+        <section class="content-section">
+            <div class="content-wrapper">
+                <div class="text-block">
+                    <h3>В системе описываются точные характеристики</h3>
+                    <p>В досье присутствует точная техническая характеристика вооружения, чтобы пользователь мог узнать больше о интересующей его технике.</p>
+                    <p>Каждая единица техники сопровождается детальным описанием тактико-технических характеристик, истории создания и боевого применения.</p>
+                </div>
+                <div class="image-container">
+                    <img src="btr.png" alt="Бронетранспортер">
+                </div>
+            </div>
+        </section>
+        
+        <section class="content-section">
+            <div class="content-wrapper">
+                <div class="text-block">
+                    <h3>Реализована система аккаунтов</h3>
+                    <p>Была добавлена система аккаунтов, чтобы пользователи могли входить в личные кабинеты, для сохранения в избранное интересующей для него техники.</p>
+                    <p>Каждый пользователь может создать свой профиль, где будет храниться история просмотров и избранные модели техники для быстрого доступа.</p>
+                </div>
+                <div class="image-container">
+                    <img src="helic.png" alt="Вертолет">
+                </div>
+            </div>
+        </section>
+        
+        <!-- Новый блок с системой администрирования -->
+        <section class="content-section">
+            <div class="content-wrapper">
+                <div class="text-block">
+                    <h3>Добавлена система администрирования</h3>
+                    <p>Для развития, а также улучшения работы проекта была разработана система администрирования. Это позволяет администраторам добавлять новую технику, а также выдавать роли и блокировать пользователей по каким-либо причинам.</p>
+                    <p>Система администрирования предоставляет удобный интерфейс для управления контентом и пользователями, обеспечивая безопасность и актуальность данных в справочнике.</p>
+                </div>
+                <div class="image-container">
+                    <img src="zrk.png" alt="Зенитно-ракетный комплекс">
+                </div>
+            </div>
+        </section>
+        
+        <footer>
+            <a href="../main.php" class="login-btn">ВХОД В СИСТЕМУ</a>
+            <p>Сделали Мурзин Максим и Агапова Полина</p>
+            <p>© 2025 Справочник военной техники. Все права защищены.</p>
+            <p>Изображения взяты из открытых источников.</p>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Функция для проверки видимости элемента
+            function isElementInViewport(el) {
+                const rect = el.getBoundingClientRect();
+                return (
+                    rect.top <= (window.innerHeight || document.documentElement.clientHeight) * 0.8 &&
+                    rect.bottom >= 0
+                );
+            }
+            
+            // Функция для обработки прокрутки
+            function handleScroll() {
+                const textBlocks = document.querySelectorAll('.text-block');
+                const imageContainers = document.querySelectorAll('.image-container');
+                
+                textBlocks.forEach(block => {
+                    if (isElementInViewport(block)) {
+                        block.classList.add('visible');
+                    } else {
+                        block.classList.remove('visible');
+                    }
+                });
+                
+                imageContainers.forEach(container => {
+                    if (isElementInViewport(container)) {
+                        container.classList.add('visible');
+                    } else {
+                        container.classList.remove('visible');
+                    }
+                });
+                
+                // Анимация фона при прокрутке - движение вниз с повторением
+                const scrollY = window.scrollY;
+                const backgroundPattern = document.querySelector('.background-pattern');
+                // Фон движется вниз и повторяется
+                backgroundPattern.style.backgroundPosition = `center ${-scrollY * 0.5}px`;
+            }
+            
+            // Обработчик события прокрутки
+            window.addEventListener('scroll', handleScroll);
+            
+            // Вызов функции при загрузке для элементов, которые уже в области видимости
+            handleScroll();
+        });
+    </script>
+</body>
+</html>
