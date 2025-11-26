@@ -211,7 +211,7 @@ $recon_count = is_array($recon_systems) ? count($recon_systems) : 0;
                         <?php echo htmlspecialchars($_SESSION['user_login']); ?>
                     </div>
                     <div class="user-dropdown">
-                        <a href="account.php" class="user-item">Перейти в профиль</a>
+                        <a href="../account.php" class="user-item">Перейти в профиль</a>
                         <a href="../auth.php?logout=true" class="user-item">Выйти из аккаунта</a>
                     </div>
                 </div>
