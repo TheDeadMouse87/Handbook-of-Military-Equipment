@@ -77,6 +77,13 @@ class DataEmulator {
     }
     
     /**
+     * Проверяет наличие английских букв в строке
+     */
+    public function hasEnglishLetters($text) {
+        return preg_match('/[a-zA-Z]/', $text);
+    }
+    
+    /**
      * Проверяет корректность ФИО
      */
     public function checkFullName($data) {
@@ -140,6 +147,9 @@ class DataEmulator {
             }
         }
         
+        // Проверяем наличие английских букв
+        $englishLettersCheck = $this->checkEnglishLetters($lastName, $firstName, $middleName);
+        
         return [
             'status' => 'success',
             'message' => 'Данные корректны',
@@ -148,7 +158,48 @@ class DataEmulator {
                 'last_name' => $lastName,
                 'first_name' => $firstName,
                 'middle_name' => $middleName
-            ]
+            ],
+            'english_letters_check' => $englishLettersCheck
+        ];
+    }
+    
+    /**
+     * Проверяет наличие английских букв в ФИО
+     */
+    private function checkEnglishLetters($lastName, $firstName, $middleName) {
+        $hasEnglish = false;
+        $details = [];
+        
+        if ($this->hasEnglishLetters($lastName)) {
+            $hasEnglish = true;
+            $details[] = [
+                'part' => 'Фамилия',
+                'value' => $lastName,
+                'message' => 'Содержит английские буквы'
+            ];
+        }
+        
+        if ($this->hasEnglishLetters($firstName)) {
+            $hasEnglish = true;
+            $details[] = [
+                'part' => 'Имя',
+                'value' => $firstName,
+                'message' => 'Содержит английские буквы'
+            ];
+        }
+        
+        if (!empty($middleName) && $this->hasEnglishLetters($middleName)) {
+            $hasEnglish = true;
+            $details[] = [
+                'part' => 'Отчество',
+                'value' => $middleName,
+                'message' => 'Содержит английские буквы'
+            ];
+        }
+        
+        return [
+            'has_english_letters' => $hasEnglish,
+            'details' => $details
         ];
     }
     
@@ -295,6 +346,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <strong>✓ " . $result['message'] . "</strong>
               </div>";
         
+        // Проверка на английские буквы
+        if (isset($result['english_letters_check']) && $result['english_letters_check']['has_english_letters']) {
+            echo "<div class='english-warning'>
+                    <strong>⚠ Обнаружены английские буквы</strong>
+                    <div class='english-details'>";
+            
+            foreach ($result['english_letters_check']['details'] as $detail) {
+                echo "<div class='english-detail-item'>
+                        <strong>" . $detail['part'] . ":</strong> \"" . htmlspecialchars($detail['value']) . "\" - " . $detail['message'] . "
+                      </div>";
+            }
+            
+            echo "</div></div>";
+        } else {
+            echo "<div class='english-info'>
+                    <strong>✓ Английские буквы не обнаружены</strong>
+                  </div>";
+        }
+        
         echo "<div class='data-grid'>
                 <div class='data-card'>
                     <h3>Полное ФИО</h3>
@@ -355,12 +425,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (count($nameParts) >= 1) {
             $lastName = trim($nameParts[0]);
             $lastChar = substr($lastName, -1);
-            $statusClass = in_array($lastChar, $invalidChars) ? 'status-incorrect' : 'status-correct';
-            $statusText = in_array($lastChar, $invalidChars) ? 'Некорректный символ' : 'Корректный символ';
+            $hasEnglish = $emulator->hasEnglishLetters($lastName);
+            $statusClass = in_array($lastChar, $invalidChars) ? 'status-incorrect' : ($hasEnglish ? 'status-warning' : 'status-correct');
+            $statusText = in_array($lastChar, $invalidChars) ? 'Некорректный символ' : ($hasEnglish ? 'Есть английские буквы' : 'Корректный символ');
             $displayChar = in_array($lastChar, $invalidChars) ? htmlspecialchars($lastChar) : ' ';
             
             echo "<p><strong>Фамилия:</strong> \"" . htmlspecialchars($lastName) . "\"</p>";
             echo "<p><strong>Последний символ фамилии:</strong> \"" . $displayChar . "\"</p>";
+            echo "<p><strong>Английские буквы в фамилии:</strong> " . ($hasEnglish ? 'Да' : 'Нет') . "</p>";
             echo "<p><strong>Статус фамилии:</strong> <span class='status-badge $statusClass'>$statusText</span></p>";
             echo "<hr style='border: none; border-top: 1px solid #3d4630; margin: 0.5rem 0;'>";
         }
@@ -369,12 +441,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (count($nameParts) >= 2) {
             $firstName = trim($nameParts[1]);
             $firstChar = substr($firstName, -1);
-            $statusClass = in_array($firstChar, $invalidChars) ? 'status-incorrect' : 'status-correct';
-            $statusText = in_array($firstChar, $invalidChars) ? 'Некорректный символ' : 'Корректный символ';
+            $hasEnglish = $emulator->hasEnglishLetters($firstName);
+            $statusClass = in_array($firstChar, $invalidChars) ? 'status-incorrect' : ($hasEnglish ? 'status-warning' : 'status-correct');
+            $statusText = in_array($firstChar, $invalidChars) ? 'Некорректный символ' : ($hasEnglish ? 'Есть английские буквы' : 'Корректный символ');
             $displayChar = in_array($firstChar, $invalidChars) ? htmlspecialchars($firstChar) : ' ';
             
             echo "<p><strong>Имя:</strong> \"" . htmlspecialchars($firstName) . "\"</p>";
             echo "<p><strong>Последний символ имени:</strong> \"" . $displayChar . "\"</p>";
+            echo "<p><strong>Английские буквы в имени:</strong> " . ($hasEnglish ? 'Да' : 'Нет') . "</p>";
             echo "<p><strong>Статус имени:</strong> <span class='status-badge $statusClass'>$statusText</span></p>";
             
             if (count($nameParts) >= 3) {
@@ -386,12 +460,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (count($nameParts) >= 3) {
             $middleName = trim($nameParts[2]);
             $middleChar = substr($middleName, -1);
-            $statusClass = in_array($middleChar, $invalidChars) ? 'status-incorrect' : 'status-correct';
-            $statusText = in_array($middleChar, $invalidChars) ? 'Некорректный символ' : 'Корректный символ';
+            $hasEnglish = $emulator->hasEnglishLetters($middleName);
+            $statusClass = in_array($middleChar, $invalidChars) ? 'status-incorrect' : ($hasEnglish ? 'status-warning' : 'status-correct');
+            $statusText = in_array($middleChar, $invalidChars) ? 'Некорректный символ' : ($hasEnglish ? 'Есть английские буквы' : 'Корректный символ');
             $displayChar = in_array($middleChar, $invalidChars) ? htmlspecialchars($middleChar) : ' ';
             
             echo "<p><strong>Отчество:</strong> \"" . htmlspecialchars($middleName) . "\"</p>";
             echo "<p><strong>Последний символ отчества:</strong> \"" . $displayChar . "\"</p>";
+            echo "<p><strong>Английские буквы в отчестве:</strong> " . ($hasEnglish ? 'Да' : 'Нет') . "</p>";
             echo "<p><strong>Статус отчества:</strong> <span class='status-badge $statusClass'>$statusText</span></p>";
         }
         
@@ -400,6 +476,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $overallStatus = ($result['status'] === 'success') ? 'Все данные корректны' : 'Обнаружены ошибки в данных';
         $overallStatusClass = ($result['status'] === 'success') ? 'status-correct' : 'status-incorrect';
         echo "<p><strong>Общий статус проверки:</strong> <span class='status-badge $overallStatusClass'>$overallStatus</span></p>";
+        
+        // Статус английских букв
+        $hasEnglishOverall = isset($result['english_letters_check']) && $result['english_letters_check']['has_english_letters'];
+        $englishStatus = $hasEnglishOverall ? 'Обнаружены английские буквы' : 'Английские буквы не обнаружены';
+        $englishStatusClass = $hasEnglishOverall ? 'status-warning' : 'status-correct';
+        echo "<p><strong>Статус английских букв:</strong> <span class='status-badge $englishStatusClass'>$englishStatus</span></p>";
     }
     
     echo "    </div>

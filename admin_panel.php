@@ -9,6 +9,9 @@ if (!isset($_SESSION['user_id'])) {
 
 // Подключаем базу данных
 include 'connect.php';
+// Подключаем логгер
+include 'Logger.php';
+$logger = new Logger($mysqli);
 
 // Проверяем, является ли пользователь администратором
 $user_id = $_SESSION['user_id'];
@@ -46,6 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $update_stmt = $mysqli->prepare("UPDATE Users SET Ban = 1 WHERE ID = ?");
                 $update_stmt->bind_param("i", $target_user_id);
                 if ($update_stmt->execute()) {
+                    // Логируем блокировку пользователя
+                    $logger->logUserBan($target_user_id, $user_id);
                     header("Location: admin_panel.php?success=user_banned");
                 } else {
                     header("Location: admin_panel.php?error=ban_failed");
@@ -57,6 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $update_stmt = $mysqli->prepare("UPDATE Users SET Ban = 0 WHERE ID = ?");
                 $update_stmt->bind_param("i", $target_user_id);
                 if ($update_stmt->execute()) {
+                    // Логируем разблокировку пользователя
+                    $logger->logUserUnban($target_user_id, $user_id);
                     header("Location: admin_panel.php?success=user_unbanned");
                 } else {
                     header("Location: admin_panel.php?error=unban_failed");
@@ -68,6 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $delete_stmt = $mysqli->prepare("DELETE FROM Users WHERE ID = ?");
                 $delete_stmt->bind_param("i", $target_user_id);
                 if ($delete_stmt->execute()) {
+                    // Логируем удаление пользователя
+                    $logger->logUserDelete($target_user_id, $user_id);
                     header("Location: admin_panel.php?success=user_deleted");
                 } else {
                     header("Location: admin_panel.php?error=delete_failed");
@@ -84,9 +93,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if (isset($_POST['new_role'])) {
                     $new_role = intval($_POST['new_role']);
+                    
+                    // Получаем текущую роль пользователя для логирования
+                    $current_role_stmt = $mysqli->prepare("SELECT Role_ID, Login FROM Users WHERE ID = ?");
+                    $current_role_stmt->bind_param("i", $target_user_id);
+                    $current_role_stmt->execute();
+                    $current_role_result = $current_role_stmt->get_result();
+                    $target_user = $current_role_result->fetch_assoc();
+                    $current_role_stmt->close();
+                    
+                    $old_role = $target_user['Role_ID'];
+                    $user_login = $target_user['Login'];
+                    
+                    // Обновляем роль
                     $update_stmt = $mysqli->prepare("UPDATE Users SET Role_ID = ? WHERE ID = ?");
                     $update_stmt->bind_param("ii", $new_role, $target_user_id);
                     if ($update_stmt->execute()) {
+                        // Логируем изменение роли
+                        $role_names = [
+                            1 => 'Пользователь',
+                            2 => 'Администратор', 
+                            3 => 'Модератор',
+                            4 => 'Главный администратор'
+                        ];
+                        $old_role_name = $role_names[$old_role] ?? $old_role;
+                        $new_role_name = $role_names[$new_role] ?? $new_role;
+                        
+                        $logger->logRoleChange($target_user_id, $old_role_name, $new_role_name, $user_id);
+                        
                         header("Location: admin_panel.php?success=role_changed");
                     } else {
                         header("Location: admin_panel.php?error=role_change_failed");
@@ -227,7 +261,7 @@ foreach ($users as $user_item) {
     </div>
 
     <!-- Модальное окно для подтверждения бана -->
-    <div id="banModal" class="modal">
+    <div id="banModal" class="modal modal-ban">
         <div class="modal-content">
             <div class="modal-header">
                 <h3 class="modal-title">Подтверждение блокировки</h3>
@@ -255,8 +289,66 @@ foreach ($users as $user_item) {
         </div>
     </div>
 
+    <!-- Модальное окно для подтверждения разблокировки -->
+    <div id="unbanModal" class="modal modal-unban">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Подтверждение разблокировки</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-text">Вы действительно хотите разблокировать пользователя?</p>
+                <div class="user-info">
+                    <strong>Логин:</strong> <span id="unbanUserLogin"></span><br>
+                    <strong>Имя:</strong> <span id="unbanUserName"></span><br>
+                    <strong>Роль:</strong> <span id="unbanUserRole"></span>
+                </div>
+                <p class="modal-warning">
+                    Пользователь снова сможет войти в систему.
+                </p>
+            </div>
+            <div class="modal-buttons">
+                <form id="unbanForm" method="POST" style="display: none;">
+                    <input type="hidden" name="user_id" id="unbanUserId">
+                    <input type="hidden" name="action" value="unban">
+                </form>
+                <button id="confirmUnban" class="modal-btn confirm-btn">Разблокировать</button>
+                <button id="cancelUnban" class="modal-btn cancel-btn">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для подтверждения удаления -->
+    <div id="deleteModal" class="modal modal-delete">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Подтверждение удаления</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-text">Вы действительно хотите удалить пользователя?</p>
+                <div class="user-info">
+                    <strong>Логин:</strong> <span id="deleteUserLogin"></span><br>
+                    <strong>Имя:</strong> <span id="deleteUserName"></span><br>
+                    <strong>Роль:</strong> <span id="deleteUserRole"></span>
+                </div>
+                <p class="modal-warning" style="color: #ff6b6b;">
+                    ⚠️ Это действие нельзя отменить! Все данные пользователя будут безвозвратно удалены.
+                </p>
+            </div>
+            <div class="modal-buttons">
+                <form id="deleteForm" method="POST" style="display: none;">
+                    <input type="hidden" name="user_id" id="deleteUserId">
+                    <input type="hidden" name="action" value="delete">
+                </form>
+                <button id="confirmDelete" class="modal-btn confirm-btn" style="background: rgba(178, 34, 34, 0.7); color: #ff6b6b; border: 1px solid #8b0000;">Удалить</button>
+                <button id="cancelDelete" class="modal-btn cancel-btn">Отмена</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Модальное окно для подтверждения создания полного бэкапа -->
-    <div id="backupModal" class="modal">
+    <div id="backupModal" class="modal modal-backup">
         <div class="modal-content">
             <div class="modal-header">
                 <h3 class="modal-title">Подтверждение создания бэкапа</h3>
@@ -365,13 +457,15 @@ foreach ($users as $user_item) {
                                                     🚫 Забанить
                                                 </button>
                                             <?php else: ?>
-                                                <form method="POST" style="display: inline;">
-                                                    <input type="hidden" name="user_id" value="<?php echo $user_item['ID']; ?>">
-                                                    <input type="hidden" name="action" value="unban">
-                                                    <button type="submit" class="action-btn" onclick="return confirm('Разблокировать пользователя?')">
-                                                        ✅ Разбанить
-                                                    </button>
-                                                </form>
+                                                <button type="button" class="action-btn" 
+                                                        onclick="openUnbanModal(
+                                                            <?php echo $user_item['ID']; ?>, 
+                                                            '<?php echo htmlspecialchars($user_item['Login']); ?>', 
+                                                            '<?php echo htmlspecialchars($user_item['Name'] ?? 'Не указано'); ?>', 
+                                                            '<?php echo htmlspecialchars($user_item['Role_Name']); ?>'
+                                                        )">
+                                                    ✅ Разбанить
+                                                </button>
                                             <?php endif; ?>
 
                                             <?php if ($can_change_roles): ?>
@@ -392,13 +486,15 @@ foreach ($users as $user_item) {
                                                 </select>
                                             <?php endif; ?>
 
-                                            <form method="POST" style="display: inline;">
-                                                <input type="hidden" name="user_id" value="<?php echo $user_item['ID']; ?>">
-                                                <input type="hidden" name="action" value="delete">
-                                                <button type="submit" class="action-btn" onclick="return confirm('Удалить пользователя? Это действие нельзя отменить!')">
-                                                    🗑️ Удалить
-                                                </button>
-                                            </form>
+                                            <button type="button" class="action-btn btn-delete" 
+                                                    onclick="openDeleteModal(
+                                                        <?php echo $user_item['ID']; ?>, 
+                                                        '<?php echo htmlspecialchars($user_item['Login']); ?>', 
+                                                        '<?php echo htmlspecialchars($user_item['Name'] ?? 'Не указано'); ?>', 
+                                                        '<?php echo htmlspecialchars($user_item['Role_Name']); ?>'
+                                                    )">
+                                                🗑️ Удалить
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -589,6 +685,54 @@ foreach ($users as $user_item) {
             }, 300);
         }
 
+        // Функции для модального окна разблокировки
+        function openUnbanModal(userId, userLogin, userName, userRole) {
+            document.getElementById('unbanUserId').value = userId;
+            document.getElementById('unbanUserLogin').textContent = userLogin;
+            document.getElementById('unbanUserName').textContent = userName;
+            document.getElementById('unbanUserRole').textContent = userRole;
+            
+            const modal = document.getElementById('unbanModal');
+            modal.style.display = 'block';
+            
+            setTimeout(() => {
+                modal.querySelector('.modal-content').style.opacity = '1';
+            }, 10);
+        }
+
+        function closeUnbanModal() {
+            const modal = document.getElementById('unbanModal');
+            modal.querySelector('.modal-content').style.opacity = '0';
+            
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 300);
+        }
+
+        // Функции для модального окна удаления
+        function openDeleteModal(userId, userLogin, userName, userRole) {
+            document.getElementById('deleteUserId').value = userId;
+            document.getElementById('deleteUserLogin').textContent = userLogin;
+            document.getElementById('deleteUserName').textContent = userName;
+            document.getElementById('deleteUserRole').textContent = userRole;
+            
+            const modal = document.getElementById('deleteModal');
+            modal.style.display = 'block';
+            
+            setTimeout(() => {
+                modal.querySelector('.modal-content').style.opacity = '1';
+            }, 10);
+        }
+
+        function closeDeleteModal() {
+            const modal = document.getElementById('deleteModal');
+            modal.querySelector('.modal-content').style.opacity = '0';
+            
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 300);
+        }
+
         // Функции для модального окна бэкапа
         function openBackupModal() {
             const modal = document.getElementById('backupModal');
@@ -611,19 +755,45 @@ foreach ($users as $user_item) {
         // Обработчики событий для модальных окон
         document.addEventListener('DOMContentLoaded', () => {
             // Модальное окно бана
-            const modal = document.getElementById('banModal');
-            const closeBtn = document.querySelector('.close-modal');
-            const cancelBtn = document.getElementById('cancelBan');
-            const confirmBtn = document.getElementById('confirmBan');
+            const banModal = document.getElementById('banModal');
+            const banCloseBtn = banModal.querySelector('.close-modal');
+            const banCancelBtn = document.getElementById('cancelBan');
+            const banConfirmBtn = document.getElementById('confirmBan');
             const banForm = document.getElementById('banForm');
 
             // Закрытие модального окна бана
-            closeBtn.addEventListener('click', closeBanModal);
-            cancelBtn.addEventListener('click', closeBanModal);
+            banCloseBtn.addEventListener('click', closeBanModal);
+            banCancelBtn.addEventListener('click', closeBanModal);
 
             // Подтверждение бана
-            confirmBtn.addEventListener('click', () => {
+            banConfirmBtn.addEventListener('click', () => {
                 banForm.submit();
+            });
+
+            // Модальное окно разблокировки
+            const unbanModal = document.getElementById('unbanModal');
+            const unbanCloseBtn = unbanModal.querySelector('.close-modal');
+            const unbanCancelBtn = document.getElementById('cancelUnban');
+            const unbanConfirmBtn = document.getElementById('confirmUnban');
+            const unbanForm = document.getElementById('unbanForm');
+
+            unbanCloseBtn.addEventListener('click', closeUnbanModal);
+            unbanCancelBtn.addEventListener('click', closeUnbanModal);
+            unbanConfirmBtn.addEventListener('click', () => {
+                unbanForm.submit();
+            });
+
+            // Модальное окно удаления
+            const deleteModal = document.getElementById('deleteModal');
+            const deleteCloseBtn = deleteModal.querySelector('.close-modal');
+            const deleteCancelBtn = document.getElementById('cancelDelete');
+            const deleteConfirmBtn = document.getElementById('confirmDelete');
+            const deleteForm = document.getElementById('deleteForm');
+
+            deleteCloseBtn.addEventListener('click', closeDeleteModal);
+            deleteCancelBtn.addEventListener('click', closeDeleteModal);
+            deleteConfirmBtn.addEventListener('click', () => {
+                deleteForm.submit();
             });
 
             // Модальное окно бэкапа
@@ -652,8 +822,14 @@ foreach ($users as $user_item) {
 
             // Закрытие при клике вне модальных окон
             window.addEventListener('click', (event) => {
-                if (event.target === modal) {
+                if (event.target === banModal) {
                     closeBanModal();
+                }
+                if (event.target === unbanModal) {
+                    closeUnbanModal();
+                }
+                if (event.target === deleteModal) {
+                    closeDeleteModal();
                 }
                 if (event.target === backupModal) {
                     closeBackupModal();
@@ -663,8 +839,14 @@ foreach ($users as $user_item) {
             // Закрытие при нажатии Escape
             document.addEventListener('keydown', (event) => {
                 if (event.key === 'Escape') {
-                    if (modal.style.display === 'block') {
+                    if (banModal.style.display === 'block') {
                         closeBanModal();
+                    }
+                    if (unbanModal.style.display === 'block') {
+                        closeUnbanModal();
+                    }
+                    if (deleteModal.style.display === 'block') {
+                        closeDeleteModal();
                     }
                     if (backupModal.style.display === 'block') {
                         closeBackupModal();

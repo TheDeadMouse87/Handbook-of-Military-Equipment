@@ -2,6 +2,11 @@
 session_start();
 include 'connect.php';
 
+// Увеличиваем время выполнения и память
+set_time_limit(300); // 5 минут
+ini_set('memory_limit', '512M');
+ini_set('max_execution_time', 300);
+
 // Проверяем права администратора
 if (!isset($_SESSION['user_id'])) {
     header("Location: auth.php");
@@ -22,107 +27,162 @@ if (!$user || ($user['Role_ID'] != 2 && $user['Role_ID'] != 4)) {
 }
 
 $message = '';
+$messageType = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['confirm_restore']) && isset($_FILES['backup_file'])) {
         if ($_FILES['backup_file']['error'] === UPLOAD_ERR_OK) {
             $tmpName = $_FILES['backup_file']['tmp_name'];
             $fileName = $_FILES['backup_file']['name'];
-            $content = file_get_contents($tmpName);
             
-            // Отключаем проверку внешних ключей
-            $mysqli->query("SET FOREIGN_KEY_CHECKS = 0");
-            
-            // Получаем список всех таблиц и очищаем их
-            $tables = [];
-            $result = $mysqli->query("SHOW TABLES");
-            while ($row = $result->fetch_array()) {
-                $tables[] = $row[0];
-            }
-            
-            // Удаляем все таблицы (в правильном порядке для избежания ошибок внешних ключей)
-            foreach ($tables as $table) {
-                $mysqli->query("DROP TABLE IF EXISTS `$table`");
-            }
-            
-            // Улучшенный парсинг SQL-файла
-            $successCount = 0;
-            $errorCount = 0;
-            $errors = [];
-            
-            // Удаляем комментарии и разбиваем на запросы
-            $content = preg_replace('/--.*$/m', '', $content); // Удаляем однострочные комментарии
-            $content = preg_replace('/\/\*.*?\*\//s', '', $content); // Удаляем многострочные комментарии
-            
-            // Разбиваем на отдельные запросы
-            $queries = [];
-            $currentQuery = '';
-            $inString = false;
-            $stringChar = '';
-            
-            for ($i = 0; $i < strlen($content); $i++) {
-                $char = $content[$i];
-                
-                // Проверяем, находимся ли мы внутри строки
-                if (($char == "'" || $char == '"') && ($i == 0 || $content[$i-1] != "\\")) {
-                    if (!$inString) {
-                        $inString = true;
-                        $stringChar = $char;
-                    } else if ($char == $stringChar) {
-                        $inString = false;
-                    }
-                }
-                
-                // Если встречаем точку с запятой и не внутри строки - это конец запроса
-                if ($char == ';' && !$inString) {
-                    $currentQuery = trim($currentQuery);
-                    if (!empty($currentQuery)) {
-                        $queries[] = $currentQuery;
-                    }
-                    $currentQuery = '';
-                } else {
-                    $currentQuery .= $char;
-                }
-            }
-            
-            // Добавляем последний запрос, если он есть
-            $lastQuery = trim($currentQuery);
-            if (!empty($lastQuery)) {
-                $queries[] = $lastQuery;
-            }
-            
-            // Выполняем запросы
-            foreach ($queries as $query) {
-                $query = trim($query);
-                
-                // Пропускаем пустые запросы и служебные команды
-                if (empty($query) || 
-                    preg_match('/^\s*(CREATE DATABASE|USE|SET|DELIMITER)/i', $query) ||
-                    strlen($query) < 10) {
-                    continue;
-                }
-                
-                if ($mysqli->query($query)) {
-                    $successCount++;
-                } else {
-                    $errorCount++;
-                    $errorMsg = $mysqli->error;
-                    // Обрезаем длинный запрос для отображения
-                    $displayQuery = strlen($query) > 100 ? substr($query, 0, 100) . '...' : $query;
-                    $errors[] = "Ошибка: $errorMsg<br>Запрос: " . htmlspecialchars($displayQuery);
-                    error_log("Restore error: " . $errorMsg . " in query: " . substr($query, 0, 200));
-                }
-            }
-            
-            // Включаем проверку внешних ключей обратно
-            $mysqli->query("SET FOREIGN_KEY_CHECKS = 1");
-            
-            if ($errorCount === 0) {
-                $message = "✅ База данных успешно восстановлена из файла <strong>$fileName</strong>! Выполнено запросов: $successCount";
-                $messageType = 'success';
+            // Проверяем, что файл действительно SQL
+            if (pathinfo($fileName, PATHINFO_EXTENSION) !== 'sql') {
+                $message = "❌ Файл должен иметь расширение .sql";
+                $messageType = 'error';
             } else {
-                $message = "⚠️ Восстановление из файла <strong>$fileName</strong> завершено с ошибками. Успешно: $successCount, Ошибок: $errorCount";
-                $messageType = 'warning';
+                // Отключаем проверку внешних ключей и авто-коммит
+                $mysqli->query("SET FOREIGN_KEY_CHECKS = 0");
+                $mysqli->query("SET AUTOCOMMIT = 0");
+                $mysqli->query("START TRANSACTION");
+                
+                try {
+                    // Получаем список всех таблиц и очищаем их
+                    $tables = [];
+                    $result = $mysqli->query("SHOW TABLES");
+                    while ($row = $result->fetch_array()) {
+                        $tables[] = $row[0];
+                    }
+                    
+                    // Удаляем все таблицы в обратном порядке (для избежания ошибок внешних ключей)
+                    foreach (array_reverse($tables) as $table) {
+                        $mysqli->query("DROP TABLE IF EXISTS `$table`");
+                    }
+                    
+                    // Восстанавливаем из SQL файла
+                    $successCount = 0;
+                    $errorCount = 0;
+                    $errors = [];
+                    
+                    // Читаем SQL файл по частям
+                    $fileHandle = fopen($tmpName, 'r');
+                    if (!$fileHandle) {
+                        throw new Exception("Не удалось открыть файл бэкапа");
+                    }
+                    
+                    $currentQuery = '';
+                    $inString = false;
+                    $stringChar = '';
+                    $escapeNext = false;
+                    $batchCount = 0;
+                    
+                    while (!feof($fileHandle)) {
+                        $line = fgets($fileHandle);
+                        if ($line === false) break;
+                        
+                        // Пропускаем комментарии
+                        $trimmedLine = trim($line);
+                        if (empty($trimmedLine) || 
+                            strpos($trimmedLine, '--') === 0 || 
+                            strpos($trimmedLine, '/*') === 0) {
+                            continue;
+                        }
+                        
+                        // Обрабатываем строку посимвольно
+                        for ($i = 0; $i < strlen($line); $i++) {
+                            $char = $line[$i];
+                            
+                            if ($escapeNext) {
+                                $currentQuery .= $char;
+                                $escapeNext = false;
+                                continue;
+                            }
+                            
+                            // Обработка экранирования
+                            if ($char == '\\') {
+                                $escapeNext = true;
+                                $currentQuery .= $char;
+                                continue;
+                            }
+                            
+                            // Обработка строк
+                            if (($char == "'" || $char == '"') && !$inString) {
+                                $inString = true;
+                                $stringChar = $char;
+                                $currentQuery .= $char;
+                            } else if (($char == "'" || $char == '"') && $inString && $char == $stringChar) {
+                                $inString = false;
+                                $currentQuery .= $char;
+                            } else if ($char == ';' && !$inString) {
+                                // Конец запроса
+                                $currentQuery = trim($currentQuery);
+                                if (!empty($currentQuery) && strlen($currentQuery) > 10) {
+                                    // Пропускаем служебные команды
+                                    if (!preg_match('/^\s*(CREATE DATABASE|USE|SET|DELIMITER)/i', $currentQuery)) {
+                                        if ($mysqli->query($currentQuery)) {
+                                            $successCount++;
+                                            $batchCount++;
+                                        } else {
+                                            $errorCount++;
+                                            $errorMsg = $mysqli->error;
+                                            $shortQuery = substr($currentQuery, 0, 100);
+                                            $errors[] = "Ошибка: " . $errorMsg . " в запросе: " . $shortQuery . "...";
+                                            
+                                            // Если ошибка критическая - прерываем
+                                            if (strpos($errorMsg, 'parse error') !== false || 
+                                                strpos($errorMsg, 'syntax error') !== false) {
+                                                throw new Exception("Критическая ошибка SQL: " . $errorMsg);
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Сбрасываем счетчик батча каждые 100 запросов
+                                    if ($batchCount >= 100) {
+                                        $batchCount = 0;
+                                    }
+                                }
+                                $currentQuery = '';
+                            } else {
+                                $currentQuery .= $char;
+                            }
+                        }
+                    }
+                    
+                    fclose($fileHandle);
+                    
+                    // Обрабатываем последний запрос, если он есть
+                    $lastQuery = trim($currentQuery);
+                    if (!empty($lastQuery) && strlen($lastQuery) > 10 && 
+                        !preg_match('/^\s*(CREATE DATABASE|USE|SET|DELIMITER)/i', $lastQuery)) {
+                        if ($mysqli->query($lastQuery)) {
+                            $successCount++;
+                        } else {
+                            $errorCount++;
+                            $errorMsg = $mysqli->error;
+                            $errors[] = "Ошибка в последнем запросе: " . $errorMsg;
+                        }
+                    }
+                    
+                    // Фиксируем транзакцию если нет ошибок
+                    if ($errorCount === 0) {
+                        $mysqli->query("COMMIT");
+                        $message = "✅ База данных успешно восстановлена из файла <strong>$fileName</strong>! Выполнено запросов: $successCount";
+                        $messageType = 'success';
+                    } else {
+                        $mysqli->query("ROLLBACK");
+                        $message = "⚠️ Восстановление отменено из-за ошибок. Успешно: $successCount, Ошибок: $errorCount";
+                        $messageType = 'error';
+                    }
+                    
+                } catch (Exception $e) {
+                    // Откатываем транзакцию при ошибке
+                    $mysqli->query("ROLLBACK");
+                    $message = "❌ Ошибка восстановления: " . $e->getMessage();
+                    $messageType = 'error';
+                }
+                
+                // Включаем проверку внешних ключей и авто-коммит обратно
+                $mysqli->query("SET FOREIGN_KEY_CHECKS = 1");
+                $mysqli->query("SET AUTOCOMMIT = 1");
             }
         } else {
             $message = "❌ Ошибка загрузки файла. Код ошибки: " . $_FILES['backup_file']['error'];
@@ -168,7 +228,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="modal-buttons">
                 <form id="restoreForm" method="POST" enctype="multipart/form-data" style="display: inline;">
                     <input type="hidden" name="confirm_restore" value="1">
-                    <input type="hidden" name="backup_file_temp" id="backupFileTemp">
                     <button type="submit" class="modal-btn confirm-btn">Продолжить восстановление</button>
                 </form>
                 <button type="button" class="modal-btn cancel-btn" onclick="closeRestoreModal()">Отмена</button>
@@ -217,13 +276,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <?php echo $message; ?>
                     <?php if (isset($errors) && count($errors) > 0): ?>
                         <div class="error-details">
-                            <strong>Детали ошибок:</strong>
-                            <?php foreach (array_slice($errors, 0, 10) as $error): ?>
+                            <strong>Детали ошибок (первые 5):</strong>
+                            <?php foreach (array_slice($errors, 0, 5) as $error): ?>
                                 <div><?php echo $error; ?></div>
                             <?php endforeach; ?>
-                            <?php if (count($errors) > 10): ?>
-                                <div>... и ещё <?php echo count($errors) - 10; ?> ошибок</div>
-                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -249,18 +305,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <script>
-    // Функция для показа уведомлений
     function showNotification(message, type = 'success') {
         const container = document.getElementById('notification-container');
-        if (!container) {
-            console.error('Notification container not found');
-            return;
-        }
+        if (!container) return;
         
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
-        notification.setAttribute('data-duration', '8000');
-        
         notification.innerHTML = `
             <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                 <div style="flex: 1;">${message}</div>
@@ -269,109 +319,88 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         `;
         
         container.appendChild(notification);
-        
-        // Анимация появления
-        setTimeout(() => {
-            notification.classList.add('show');
-        }, 100);
-        
-        // Автоматическое удаление через 8 секунд
-        setTimeout(() => {
-            closeNotification(notification.querySelector('.notification-close'));
-        }, 8000);
+        setTimeout(() => notification.classList.add('show'), 100);
+        setTimeout(() => closeNotification(notification.querySelector('.notification-close')), 8000);
     }
 
-    // Функция для закрытия уведомления
     function closeNotification(closeBtn) {
         const notification = closeBtn.closest('.notification');
         if (!notification) return;
-        
         notification.classList.remove('show');
         notification.classList.add('hide');
-        
-        setTimeout(() => {
-            if (notification.parentElement) {
-                notification.remove();
-            }
-        }, 400);
+        setTimeout(() => notification.remove(), 400);
     }
 
-    // Функции для модального окна восстановления
     function showRestoreModal() {
         const fileInput = document.getElementById('backup_file');
-        const fileName = fileInput.files[0] ? fileInput.files[0].name : '';
+        const file = fileInput.files[0];
         
-        if (!fileName) {
+        if (!file) {
             showNotification('❌ Пожалуйста, выберите файл бэкапа', 'error');
             return;
         }
         
-        const modal = document.getElementById('restoreModal');
-        const backupFileTemp = document.getElementById('backupFileTemp');
-        
-        // Здесь можно добавить логику для временного сохранения файла
-        // Пока просто показываем модальное окно
-        backupFileTemp.value = fileName;
-        
-        modal.style.display = 'block';
-        modal.classList.add('modal-restore');
+        if (!file.name.toLowerCase().endsWith('.sql')) {
+            showNotification('❌ Файл должен иметь расширение .sql', 'error');
+            return;
+        }
+
+        // Создаем FormData для передачи файла
+        const restoreForm = document.getElementById('restoreForm');
+        const existingFileInput = restoreForm.querySelector('input[type="file"]');
+        if (existingFileInput) {
+            existingFileInput.remove();
+        }
+
+        // Создаем новый input для файла в форме модального окна
+        const newFileInput = document.createElement('input');
+        newFileInput.type = 'file';
+        newFileInput.name = 'backup_file';
+        newFileInput.style.display = 'none';
+        restoreForm.appendChild(newFileInput);
+
+        // Копируем файл используя File constructor
+        const newFile = new File([file], file.name, { type: file.type });
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(newFile);
+        newFileInput.files = dataTransfer.files;
+
+        document.getElementById('restoreModal').style.display = 'block';
         document.body.style.overflow = 'hidden';
     }
 
     function closeRestoreModal() {
-        const modal = document.getElementById('restoreModal');
-        modal.style.display = 'none';
-        modal.classList.remove('modal-restore');
+        document.getElementById('restoreModal').style.display = 'none';
         document.body.style.overflow = 'auto';
     }
 
-    // Закрытие модального окна при клике вне его
     window.addEventListener('click', function(event) {
         const modal = document.getElementById('restoreModal');
-        if (event.target === modal) {
-            closeRestoreModal();
-        }
+        if (event.target === modal) closeRestoreModal();
     });
 
-    // Закрытие модального окна при нажатии Escape
     document.addEventListener('keydown', function(event) {
-        if (event.key === 'Escape') {
-            closeRestoreModal();
-        }
+        if (event.key === 'Escape') closeRestoreModal();
     });
 
-    // Обработчик для кнопки восстановления
     document.getElementById('restoreButton').addEventListener('click', showRestoreModal);
 
-    // Обработчик для формы загрузки файла
     document.getElementById('uploadForm').addEventListener('submit', function(e) {
         e.preventDefault();
         showRestoreModal();
     });
 
-    // Показ уведомлений при загрузке страницы
     document.addEventListener('DOMContentLoaded', function() {
         <?php if ($message): ?>
             showNotification(`<?php echo addslashes($message); ?>`, '<?php echo $messageType ?? 'success'; ?>');
         <?php endif; ?>
-
-        // Показываем предупреждение при загрузке страницы
-        showNotification(
-            '⚠️ <strong>Внимание!</strong> Восстановление базы данных удалит все существующие данные. Убедитесь, что у вас есть свежий бэкап.',
-            'warning'
-        );
     });
 
-    // Валидация файла
     document.getElementById('backup_file').addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (file) {
-            const fileName = file.name.toLowerCase();
-            if (!fileName.endsWith('.sql')) {
+            if (!file.name.toLowerCase().endsWith('.sql')) {
                 showNotification('❌ Пожалуйста, выберите файл с расширением .sql', 'error');
-                e.target.value = '';
-            } else if (file.size > 50 * 1024 * 1024) { // 50MB limit
-                showNotification('❌ Файл слишком большой. Максимальный размер: 50MB', 'error');
                 e.target.value = '';
             } else {
                 showNotification(`✅ Файл "${file.name}" выбран для восстановления`, 'success');

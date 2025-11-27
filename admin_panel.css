@@ -1,4 +1,4 @@
-/* admin_panel.css - Полный CSS файл */
+/* admin_panel.css - Полный CSS файл с стилями для админ-панели */
 * {
     margin: 0;
     padding: 0;
@@ -282,6 +282,19 @@ body::before {
     transform: translateY(-1px);
 }
 
+.admin-control-btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: rgba(61, 70, 48, 0.3);
+}
+
+.admin-control-btn.disabled:hover {
+    transform: none;
+    background: rgba(61, 70, 48, 0.3);
+    color: #8b966c;
+    border-color: #3d4630;
+}
+
 /* Секция пользователей */
 .users-section {
     margin-bottom: 2rem;
@@ -437,19 +450,6 @@ body::before {
     background: rgba(205, 92, 92, 0.9) !important;
     color: #ffffff !important;
     border-color: #ff6b6b !important;
-}
-
-/* Стили для кнопки восстановления */
-.btn-restore {
-    background: rgba(220, 53, 69, 0.7) !important;
-    color: #ffffff !important;
-    border: 1px solid #dc3545 !important;
-}
-
-.btn-restore:hover {
-    background: rgba(220, 53, 69, 0.9) !important;
-    color: #ffffff !important;
-    border-color: #ff6b7a !important;
 }
 
 .role-select-form {
@@ -765,6 +765,58 @@ body::before {
     box-shadow: 0 5px 15px rgba(139, 150, 108, 0.2);
 }
 
+/* Стили для модального окна бана */
+.modal-ban .modal-content {
+    border: 2px solid #8b966c;
+    box-shadow: 0 0 30px rgba(139, 150, 108, 0.3);
+}
+
+.modal-ban .modal-title {
+    color: #8b966c;
+}
+
+.modal-ban .confirm-btn {
+    background: rgba(61, 70, 48, 0.7);
+    color: #8b966c;
+    border: 1px solid #3d4630;
+}
+
+.modal-ban .confirm-btn:hover {
+    background: rgba(74, 85, 56, 0.9);
+    color: #ffffff;
+    border-color: #8b966c;
+}
+
+/* Стили для модального окна разблокировки */
+.modal-unban .modal-content {
+    border: 2px solid #4caf50;
+    box-shadow: 0 0 30px rgba(76, 175, 80, 0.3);
+}
+
+.modal-unban .modal-title {
+    color: #4caf50;
+}
+
+.modal-unban .confirm-btn {
+    background: rgba(76, 175, 80, 0.7);
+    color: #4caf50;
+    border: 1px solid #4caf50;
+}
+
+.modal-unban .confirm-btn:hover {
+    background: rgba(76, 175, 80, 0.9);
+    color: #ffffff;
+    border-color: #66bb6a;
+}
+
+.modal-unban .user-info {
+    border-left: 4px solid #4caf50;
+}
+
+.modal-unban .modal-warning {
+    color: #4caf50;
+}
+
 /* Стили для модального окна удаления */
 .modal-delete .modal-content {
     border: 2px solid #8b0000;
@@ -772,10 +824,6 @@ body::before {
 }
 
 .modal-delete .modal-title {
-    color: #ff6b6b;
-}
-
-.modal-delete .modal-warning {
     color: #ff6b6b;
 }
 
@@ -791,36 +839,12 @@ body::before {
     border-color: #ff6b6b;
 }
 
-/* Стили для модального окна восстановления */
-.modal-restore .modal-content {
-    border: none;
-    box-shadow: 0 0 40px rgba(220, 53, 69, 0.4);
+.modal-delete .user-info {
+    border-left: 4px solid #8b0000;
 }
 
-.modal-restore .modal-title {
-    color: #dc3545;
-}
-
-.modal-restore .confirm-btn {
-    background: rgba(76, 175, 80, 0.8);
-    color: #ffffff;
-    border: 1px solid #4caf50;
-}
-
-.modal-restore .confirm-btn:hover {
-    background: rgba(76, 175, 80, 0.9);
-    color: #ffffff;
-    border-color: #66bb6a;
-}
-
-.modal-restore .user-info {
-    border-left: 4px solid #dc3545;
-    background: rgba(25, 25, 25, 0.8);
-    color: #ffffff;
-}
-
-.modal-restore .modal-warning {
-    color: #dc3545;
+.modal-delete .modal-warning {
+    color: #ff6b6b;
     font-weight: bold;
 }
 
@@ -928,6 +952,19 @@ body::before {
     color: #ffffff;
     border-color: #8b966c;
     transform: translateY(-1px);
+}
+
+.quick-btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: rgba(61, 70, 48, 0.3);
+}
+
+.quick-btn.disabled:hover {
+    transform: none;
+    background: rgba(61, 70, 48, 0.3);
+    color: #8b966c;
+    border-color: #3d4630;
 }
 
 /* Стили для бэкапирования */
@@ -2129,205 +2166,6 @@ body::before {
 .action-favorite_add { background: rgba(233, 30, 99, 0.2); color: #e91e63; border: 1px solid #e91e63; }
 .action-favorite_remove { background: rgba(158, 158, 158, 0.2); color: #9e9e9e; border: 1px solid #9e9e9e; }
 
-/* Стили для эмулятора (перенесены из emulator.php) */
-.data-section {
-    background: rgba(0, 0, 0, 0.7);
-    border: 2px solid #3d4630;
-    border-radius: 6px;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.section-header {
-    color: #8b966c;
-    font-size: 1.1rem;
-    margin-bottom: 1rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.success {
-    color: #8b966c;
-    padding: 1rem;
-    background: rgba(61, 70, 48, 0.3);
-    border: 2px solid #8b966c;
-    border-radius: 6px;
-    margin: 0.5rem 0;
-    font-weight: bold;
-    text-align: center;
-    font-size: 1rem;
-}
-
-.error {
-    color: #ff6b6b;
-    padding: 1rem;
-    background: rgba(61, 70, 48, 0.3);
-    border: 2px solid #8b0000;
-    border-radius: 6px;
-    margin: 0.5rem 0;
-    font-weight: bold;
-    text-align: center;
-    font-size: 1rem;
-}
-
-.info {
-    color: #8b966c;
-    padding: 0.8rem;
-    background: rgba(61, 70, 48, 0.3);
-    border: 1px solid #3d4630;
-    border-radius: 4px;
-    margin: 0.5rem 0;
-    font-size: 0.9rem;
-}
-
-.warning {
-    color: #ffc107;
-    padding: 0.8rem;
-    background: rgba(61, 70, 48, 0.3);
-    border: 1px solid #ffc107;
-    border-radius: 4px;
-    margin: 0.5rem 0;
-    font-size: 0.9rem;
-}
-
-pre {
-    background: rgba(0, 0, 0, 0.5);
-    border: 1px solid #3d4630;
-    border-radius: 4px;
-    padding: 1rem;
-    overflow-x: auto;
-    color: #d4d4d4;
-    font-size: 0.85rem;
-    margin: 0.5rem 0;
-    max-height: 200px;
-    overflow-y: auto;
-}
-
-button {
-    padding: 0.7rem 1.2rem;
-    border: 2px solid #3d4630;
-    border-radius: 4px;
-    background: rgba(61, 70, 48, 0.7);
-    color: #8b966c;
-    text-decoration: none;
-    font-weight: bold;
-    font-size: 0.85rem;
-    transition: all 0.3s ease;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    cursor: pointer;
-    display: inline-block;
-    text-align: center;
-}
-
-button:hover {
-    background: rgba(74, 85, 56, 0.9);
-    color: #ffffff;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(139, 150, 108, 0.3);
-}
-
-.action-buttons {
-    display: flex;
-    gap: 0.8rem;
-    margin-top: 1rem;
-    justify-content: center;
-}
-
-.data-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-    margin: 1rem 0;
-}
-
-.data-card {
-    background: rgba(0, 0, 0, 0.5);
-    border: 1px solid #3d4630;
-    border-radius: 4px;
-    padding: 1rem;
-    text-align: center;
-    transition: all 0.3s ease;
-}
-
-.data-card:hover {
-    border-color: #8b966c;
-    transform: translateY(-2px);
-}
-
-.data-card h3 {
-    color: #8b966c;
-    margin-bottom: 0.5rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-size: 0.9rem;
-}
-
-.data-card p {
-    color: #d4d4d4;
-    font-size: 1rem;
-    font-weight: bold;
-    margin: 0;
-}
-
-.invalid-chars {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    justify-content: center;
-    margin: 0.5rem 0;
-}
-
-.char-badge {
-    padding: 0.2rem 0.5rem;
-    background: rgba(61, 70, 48, 0.5);
-    border: 1px solid #8b966c;
-    border-radius: 2px;
-    color: #8b966c;
-    font-family: 'Courier New', monospace;
-    font-weight: bold;
-    font-size: 0.8rem;
-}
-
-.debug-info {
-    background: rgba(0, 0, 0, 0.5);
-    border: 1px solid #3d4630;
-    border-radius: 4px;
-    padding: 0.8rem;
-    margin-top: 0.8rem;
-    font-size: 0.8rem;
-    color: #8b966c;
-}
-
-.debug-info p {
-    margin: 0.3rem 0;
-}
-
-.debug-info strong {
-    color: #d4d4d4;
-}
-
-.status-badge {
-    padding: 0.2rem 0.6rem;
-    border-radius: 3px;
-    font-size: 0.75rem;
-    font-weight: bold;
-    text-transform: uppercase;
-}
-
-.status-correct {
-    background: rgba(139, 150, 108, 0.2);
-    color: #8b966c;
-    border: 1px solid #8b966c;
-}
-
-.status-incorrect {
-    background: rgba(178, 34, 34, 0.2);
-    color: #ff6b6b;
-    border: 1px solid #8b0000;
-}
-
 /* Адаптивность */
 @media (max-width: 1024px) {
     .action-buttons {
@@ -2623,24 +2461,6 @@ button:hover {
         padding: 1rem 1.5rem;
         font-size: 1rem;
     }
-
-    /* Адаптивность для эмулятора */
-    .data-grid {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 0.8rem;
-    }
-
-    .data-card {
-        padding: 0.8rem;
-    }
-
-    .data-card h3 {
-        font-size: 0.8rem;
-    }
-
-    .data-card p {
-        font-size: 0.9rem;
-    }
 }
 
 @media (max-width: 480px) {
@@ -2833,15 +2653,5 @@ button:hover {
     .restore-btn {
         padding: 0.8rem 1rem;
         font-size: 0.9rem;
-    }
-
-    /* Адаптивность для эмулятора */
-    .data-grid {
-        grid-template-columns: 1fr;
-        gap: 0.6rem;
-    }
-
-    .data-section {
-        padding: 0.8rem;
     }
 }
